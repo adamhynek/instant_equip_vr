@@ -5,6 +5,7 @@
 #include "skse64_common/BranchTrampoline.h"
 #include "skse64/PapyrusEvents.h"
 #include "skse64/GameData.h"
+#include "skse64_common/SafeWrite.h"
 
 #include <ShlObj.h>  // CSIDL_MYDOCUMENTS
 
@@ -131,6 +132,29 @@ bool TryHook()
 	return true;
 }
 
+// Animation graph hook for the player that allows specific animations to be blocked from playing
+typedef uint64_t(*IAnimationGraphManagerHolder_NotifyAnimationGraph_VFunc)(uintptr_t* iagmh, BSFixedString* animName);
+IAnimationGraphManagerHolder_NotifyAnimationGraph_VFunc g_originalNotifyAnimationGraph = nullptr; // Normally a JMP to 0x00501530
+static RelocPtr<IAnimationGraphManagerHolder_NotifyAnimationGraph_VFunc> IAnimationGraphManagerHolder_NotifyAnimationGraph_vtbl(0x016E2BF8);
+uint64_t Hooked_IAnimationGraphManagerHolder_NotifyAnimationGraph(uintptr_t* iAnimationGraphManagerHolder, BSFixedString* animationName)
+{
+
+	std::string animName(animationName->data);
+	//_MESSAGE(animName.c_str());
+
+	if (
+		animName == "Magic_Equip" ||
+		animName == "Magic_Solo_Equip" ||
+		animName == "MagicForceEquip" ||
+		animName == "MagicForceEquipLeft" ||
+		animName == "MagicForceEquipRight"
+		){
+		//_MESSAGE("Draw spell");
+		g_overrideAnimRate = true;
+	}
+
+	return g_originalNotifyAnimationGraph(iAnimationGraphManagerHolder, animationName);
+}
 
 extern "C" {
 	void OnDataLoaded()
@@ -199,6 +223,9 @@ extern "C" {
 			_ERROR("[CRITICAL] Failed to perform hooks");
 			return false;
 		}
+
+		g_originalNotifyAnimationGraph = *IAnimationGraphManagerHolder_NotifyAnimationGraph_vtbl;
+		SafeWrite64(IAnimationGraphManagerHolder_NotifyAnimationGraph_vtbl.GetUIntPtr(), uintptr_t(Hooked_IAnimationGraphManagerHolder_NotifyAnimationGraph));
 
 		return true;
 	}
