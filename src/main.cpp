@@ -4,6 +4,7 @@
 #include "skse64/PapyrusEvents.h"
 #include "skse64/GameData.h"
 #include "skse64_common/SafeWrite.h"
+#include "skse64/GameRTTI.h"
 
 #include <ShlObj.h>  // CSIDL_MYDOCUMENTS
 #include "version.h"
@@ -16,6 +17,18 @@ static SKSEMessagingInterface *g_messaging = nullptr;
 int g_numSkipAnimationFrames = 0;
 
 
+bool IsBoundWeapon(TESForm *form)
+{
+    if (!form || !form->IsWeapon()) {
+        return false;
+    }
+    TESObjectWEAP *weapon = DYNAMIC_CAST(form, TESForm, TESObjectWEAP);
+    if (!weapon) {
+        return false;
+    }
+    return (weapon->gameData.flags1 & TESObjectWEAP::GameData::Flags1::kFlags_BoundWeapon) != 0;
+}
+
 struct EquipActionEventHandler : ActionEventHandler
 {
     virtual	EventResult	ReceiveEvent(SKSEActionEvent *evn, EventDispatcher<SKSEActionEvent> *dispatcher)
@@ -26,16 +39,26 @@ struct EquipActionEventHandler : ActionEventHandler
 
         if (evn->type == SKSEActionEvent::kType_BeginDraw || evn->type == SKSEActionEvent::kType_BeginSheathe) {
             PlayerCharacter *player = *g_thePlayer;
-            std::vector<UInt32> &ignoreFormIDs = evn->type == SKSEActionEvent::kType_BeginDraw ? Config::options.drawIgnoreFormIDs : Config::options.sheatheIgnoreFormIDs;
+            bool isDraw = (evn->type == SKSEActionEvent::kType_BeginDraw);
+            bool ignoreBoundWeapons = isDraw ? Config::options.drawIgnoreBoundWeapons : Config::options.sheatheIgnoreBoundWeapons;
+            std::vector<UInt32> &ignoreFormIDs = isDraw ? Config::options.drawIgnoreFormIDs : Config::options.sheatheIgnoreFormIDs;
 
             TESForm *mainHandObj = player->GetEquippedObject(false);
-            if (mainHandObj && std::find(ignoreFormIDs.begin(), ignoreFormIDs.end(), mainHandObj->formID) != ignoreFormIDs.end()) {
-                return EventResult::kEvent_Continue;
+            if (mainHandObj) {
+                if ((ignoreBoundWeapons && IsBoundWeapon(mainHandObj)) ||
+                    (std::find(ignoreFormIDs.begin(), ignoreFormIDs.end(), mainHandObj->formID) != ignoreFormIDs.end()))
+                {
+                    return EventResult::kEvent_Continue;
+                }
             }
 
             TESForm *offHandObj = player->GetEquippedObject(true);
-            if (offHandObj && std::find(ignoreFormIDs.begin(), ignoreFormIDs.end(), offHandObj->formID) != ignoreFormIDs.end()) {
-                return EventResult::kEvent_Continue;
+            if (offHandObj) {
+                if ((ignoreBoundWeapons && IsBoundWeapon(offHandObj)) ||
+                    (std::find(ignoreFormIDs.begin(), ignoreFormIDs.end(), offHandObj->formID) != ignoreFormIDs.end()))
+                {
+                    return EventResult::kEvent_Continue;
+                }
             }
 
             g_numSkipAnimationFrames = Config::options.numSkipAnimationFrames;
