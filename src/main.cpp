@@ -25,6 +25,19 @@ struct EquipActionEventHandler : ActionEventHandler
         }
 
         if (evn->type == SKSEActionEvent::kType_BeginDraw || evn->type == SKSEActionEvent::kType_BeginSheathe) {
+            PlayerCharacter *player = *g_thePlayer;
+            std::vector<UInt32> &ignoreFormIDs = evn->type == SKSEActionEvent::kType_BeginDraw ? Config::options.drawIgnoreFormIDs : Config::options.sheatheIgnoreFormIDs;
+
+            TESForm *mainHandObj = player->GetEquippedObject(false);
+            if (mainHandObj && std::find(ignoreFormIDs.begin(), ignoreFormIDs.end(), mainHandObj->formID) != ignoreFormIDs.end()) {
+                return EventResult::kEvent_Continue;
+            }
+
+            TESForm *offHandObj = player->GetEquippedObject(true);
+            if (offHandObj && std::find(ignoreFormIDs.begin(), ignoreFormIDs.end(), offHandObj->formID) != ignoreFormIDs.end()) {
+                return EventResult::kEvent_Continue;
+            }
+
             g_numSkipAnimationFrames = Config::options.numSkipAnimationFrames;
         }
 
