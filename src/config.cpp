@@ -102,11 +102,6 @@ namespace Config {
     {
         if (!ReadFloat("skipAnimationDeltaTime", options.skipAnimationDeltaTime)) return false;
         if (!ReadInt("numSkipAnimationFrames", options.numSkipAnimationFrames)) return false;
-        if (!ReadBool("drawIgnoreBoundWeapons", options.drawIgnoreBoundWeapons)) return false;
-        if (!ReadBool("sheatheIgnoreBoundWeapons", options.sheatheIgnoreBoundWeapons)) return false;
-
-        if (!ReadFormArray("drawIgnoreFormIDs", options.drawIgnoreFormIDs)) return false;
-        if (!ReadFormArray("sheatheIgnoreFormIDs", options.sheatheIgnoreFormIDs)) return false;
 
         return true;
     }

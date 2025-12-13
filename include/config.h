@@ -4,10 +4,6 @@ namespace Config {
     struct Options {
         int numSkipAnimationFrames = 1;
         float skipAnimationDeltaTime = 10000.f;
-        bool drawIgnoreBoundWeapons = true;
-        bool sheatheIgnoreBoundWeapons = true;
-        std::vector<UInt32> drawIgnoreFormIDs = {};
-        std::vector<UInt32> sheatheIgnoreFormIDs = {};
     };
     extern Options options; // global object containing options
 
