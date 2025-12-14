@@ -36,24 +36,6 @@ struct EquipActionEventHandler : ActionEventHandler
 EquipActionEventHandler equipActionHandler;
 
 
-float g_originalDeltaTime = 0.0f;
-
-// PlayerCharacter::UpdateAnimation hook for altering the player's animation rate
-typedef void(*_Actor_UpdateAnimation)(Actor *_this, float deltaTime);
-_Actor_UpdateAnimation g_originalPCUpdateAnimation = nullptr;
-static RelocPtr<_Actor_UpdateAnimation> PlayerCharacter_UpdateAnimation_vtbl(0x16E2618); // 0x16E2230 + 0x7D * 8
-void PlayerCharacter_UpdateAnimation_Hook(Actor *_this, float deltaTime)
-{
-    g_originalDeltaTime = deltaTime;
-
-    if (g_numSkipAnimationFrames > 0) {
-        --g_numSkipAnimationFrames;
-        deltaTime = Config::options.skipAnimationDeltaTime;
-    }
-    g_originalPCUpdateAnimation(_this, deltaTime);
-}
-
-
 struct BShkbAnimationGraph_UpdateData
 {
         float deltaTime; // 00
@@ -74,27 +56,22 @@ struct BShkbAnimationGraph_UpdateData
         // ...
 };
 
-typedef bool(*_PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects)(PlayerCharacter *player, void **bipedAnim, BShkbAnimationGraph_UpdateData *updateData);
-_PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects g_originalPCUpdateWeaponAnimationOnAllBipedObjects3p = nullptr;
-_PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects g_originalPCUpdateWeaponAnimationOnAllBipedObjects1p = nullptr;
-static RelocPtr<_PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects> PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_3p_HookLoc(0x6C574E);
-static RelocPtr<_PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects> PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_1p_HookLoc(0x6C576B);
-
-bool PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_3p_Hook(PlayerCharacter *player, void **bipedAnim, BShkbAnimationGraph_UpdateData *updateData)
+typedef bool(*_IAnimationGraphManagerHolder_UpdateAnimation)(IAnimationGraphManagerHolder *a1, BShkbAnimationGraph_UpdateData *a2);
+_IAnimationGraphManagerHolder_UpdateAnimation g_originalPCAnimationGraphManagerHolderUpdateAnimation = nullptr;
+static RelocPtr<_IAnimationGraphManagerHolder_UpdateAnimation> PlayerCharacter_UpdateAnimation_IAnimationGraphManagerHolder_UpdateAnimation_HookLoc(0x6C5716);
+bool PlayerCharacter_UpdateAnimation_IAnimationGraphManagerHolder_UpdateAnimation_Hook(IAnimationGraphManagerHolder *a1, BShkbAnimationGraph_UpdateData *a2)
 {
-    float overridenDeltaTime = updateData->deltaTime;
-    updateData->deltaTime = g_originalDeltaTime;
-    bool ret = g_originalPCUpdateWeaponAnimationOnAllBipedObjects3p(player, bipedAnim, updateData);
-    updateData->deltaTime = overridenDeltaTime;
-    return ret;
-}
+    float originalDeltaTime = a2->deltaTime;
 
-bool PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_1p_Hook(PlayerCharacter *player, void **bipedAnim, BShkbAnimationGraph_UpdateData *updateData)
-{
-    float overridenDeltaTime = updateData->deltaTime;
-    updateData->deltaTime = g_originalDeltaTime;
-    bool ret = g_originalPCUpdateWeaponAnimationOnAllBipedObjects1p(player, bipedAnim, updateData);
-    updateData->deltaTime = overridenDeltaTime;
+    if (g_numSkipAnimationFrames > 0) {
+        --g_numSkipAnimationFrames;
+        a2->deltaTime = Config::options.skipAnimationDeltaTime;
+    }
+
+    bool ret = g_originalPCAnimationGraphManagerHolderUpdateAnimation(a1, a2);
+
+    a2->deltaTime = originalDeltaTime;
+
     return ret;
 }
 
@@ -102,7 +79,7 @@ bool PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_1p_Hook(PlayerCharac
 bool TryHook()
 {
     // This should be sized to the actual amount used by your trampoline
-    static const size_t TRAMPOLINE_SIZE = 32;
+    static const size_t TRAMPOLINE_SIZE = 16;
 
     if (g_trampoline) {
         void *branch = g_trampoline->AllocateFromBranchPool(g_pluginHandle, TRAMPOLINE_SIZE);
@@ -224,15 +201,8 @@ extern "C" {
         }
 
         {
-            g_originalPCUpdateAnimation = *PlayerCharacter_UpdateAnimation_vtbl;
-            SafeWrite64(PlayerCharacter_UpdateAnimation_vtbl.GetUIntPtr(), uintptr_t(PlayerCharacter_UpdateAnimation_Hook));
-        }
-
-        {
-            std::uintptr_t originalFunc = Write5Call(PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_3p_HookLoc.GetUIntPtr(), uintptr_t(PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_3p_Hook));
-            g_originalPCUpdateWeaponAnimationOnAllBipedObjects3p = (_PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects)originalFunc;
-            originalFunc = Write5Call(PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_1p_HookLoc.GetUIntPtr(), uintptr_t(PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects_1p_Hook));
-            g_originalPCUpdateWeaponAnimationOnAllBipedObjects1p = (_PlayerCharacter_UpdateWeaponAnimationOnAllBipedObjects)originalFunc;
+            std::uintptr_t originalFunc = Write5Call(PlayerCharacter_UpdateAnimation_IAnimationGraphManagerHolder_UpdateAnimation_HookLoc.GetUIntPtr(), uintptr_t(PlayerCharacter_UpdateAnimation_IAnimationGraphManagerHolder_UpdateAnimation_Hook));
+            g_originalPCAnimationGraphManagerHolderUpdateAnimation = (_IAnimationGraphManagerHolder_UpdateAnimation)originalFunc;
         }
 
         return true;
